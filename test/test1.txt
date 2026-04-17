@@ -1,6 +1,0 @@
-
-VAR a EQUAL 3 END
-IF a BIGGER 1 DO
-    CALL_FUNC printf "%d\n" a
-END
-
