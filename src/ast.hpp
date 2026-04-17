@@ -29,7 +29,8 @@ enum Type: uint16_t {
     IF, ELSE,
     DIGITS,
     IDENTIFIER,
-    END, // TODO: BIGGER, SMALLER, EQUALS, EQUAL, AND, OR, NOT, END
+    END, 
+    BIGGER, SMALLER, EQUALS, EQUAL, AND, OR, NOT,
     UNKNOWN
 };
 
@@ -51,6 +52,8 @@ private:
 public:
     AST() = default;
     AST(HeadType& head, ASTs&); // not constant
+
+    // TODO: skip, match, term, expr
 
     auto operator[] (size_t index) -> AST&; // for ast[i]
     auto operator* () -> HeadType&; // for ast->type

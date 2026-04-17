@@ -24,6 +24,17 @@
 
 #include <cstdint>
 
+#if defined(_WIN32)
+    #define WINDOWS
+#elif defined(__LINUX__)
+    #define LINUX
+#elif defined(__APPLE__) && defined(__MACH__)
+    #define MACOS
+#else
+    #error "Unknown system"
+    #define UNKNOWN_SYSTEM
+#endif
+
 #define TODOError(string) _TODOError(string, __LINE__)
 #define TODO(string) TODOError(string)
 #define NEXT_INDEX (index+1)

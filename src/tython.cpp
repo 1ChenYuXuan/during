@@ -31,7 +31,7 @@
 
 using Tokens = std::vector<Token>;
 
-auto printAllTokens(const Tokens& tokens) -> void {
+static inline auto printAllTokens(const Tokens& tokens) -> void {
     for (Token token : tokens) {
         std::cout << "Type: " << token.head.type << "\n";
         std::cout << "Str : " << token.str << "\n";
@@ -39,51 +39,66 @@ auto printAllTokens(const Tokens& tokens) -> void {
     std::cout << std::flush;
 }
 
-auto readAll(const std::string& filename) -> std::string {
+static inline auto readAll(const std::string& filename) -> std::string {
     std::ifstream ifs(filename);
     return std::string(std::istreambuf_iterator<char>(ifs),
-                       std::istreambuf_iterator<char>());
+                       std::istreambuf_iterator<char>(  ));
 }
 
-auto isDigits(const std::string& str) -> bool {
+static inline auto isDigits(const std::string& str) -> bool {
     if (str.empty()) return false;
     for (char c : str)
         if (!isdigit(static_cast<unsigned char>(c)))
             return false;
+
     return true;
 }
 
-auto isLetterORUnderscore(const char c) -> bool {
-    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || c == '_';
+static inline auto isIderChar(const char c) -> bool {
+    return isIderCharExceptNumber(c) || ('0' < c && c < '9');
 }
 
-auto isIdentifier(const std::string& str) -> bool {
-    for (char c : str)
-        if (!isLetterORUnderscore(c))
+static inline auto isIderCharExceptNumber(const char c) -> bool {
+    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || c == '_' || c == '<' || c == '>' || c == '=' || c == '!=' || c == '$';
+}
+
+static inline auto isIdentifier(const std::string& str) -> bool {
+    if (!isIderCharExceptNumber(str[0]))
+        return false;
+    for (size_t i = 0; i < str.size(); ++i)
+        if (!isIderChar(str[i]))
             return false;
+
     return true;
 }
 
-auto isWhite(const char c) -> bool {
-    return  c == ' '  ||
-            c == '\n' ||
-            c == '\t' ||
-            c == '\r';
+static inline auto isWhite(const char c) -> bool {
+    return isspace(c);
 }
 
-auto isWhites(const std::string& str) -> bool {
+static inline auto isWhites(const std::string& str) -> bool {
     for (char c : str)
         if (!isWhite(c))
             return false;
     return true;
 }
 
-auto typeToken(const std::string& str) -> Type {
+static inline auto typeToken(const std::string& str) -> Type {
     if (str == "IF") return IF;
     if (str == "ELSE") return ELSE;
     if (str == "END") return END;
+    // For BIGGER, SMALLER, EQUALS, EQUAL, AND, OR and NOT
+    if (str == "BIGGER") return BIGGER;
+    if (str == "SMALLER") return SMALLER;
+    if (str == "EQUALS") return EQUALS;
+    if (str == "EQUAL") return EQUAL;
+    if (str == "AND") return AND;
+    if (str == "OR") return OR;
+    if (str == "NOT") return NOT;
+
     if (isDigits(str)) return DIGITS;
     if (isIdentifier(str)) return IDENTIFIER;
+
     return UNKNOWN;
 }
 
@@ -122,6 +137,7 @@ auto lexer(const std::string& str) -> Tokens {
 }
 
 auto parse(const Tokens& tokens) -> AST {
+    // TODO: finish parser
     return AST();
 }
 
