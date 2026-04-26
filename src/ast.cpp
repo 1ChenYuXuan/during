@@ -40,48 +40,83 @@ auto AST::cstring(size_t indent) -> std::string const {
         indentStr += ' ';
     switch (this->head.type) {
     case EQUALS: {
-        if (this->str == "INT_DECL")
-            return indentStr + "int " + this->asts[0].str + ";\n" ;
-        else if (this->str == "INT_ASSIGN")
-            return indentStr + "int " + this->asts[0].str + " = " + this->asts[1].cstring() + ";\n";
-        else
-            throw ASTError("Unknown INT AST type: " + this->str);
-        // break;
-    } case IDENTIFIER:
-        return this->str;
-        // break;
+        if (this->asts.size() == 1) {
+            return indentStr + this->asts[0].cstring() + " " + this->str;
+        } else {
+            return indentStr + this->asts[0].cstring() + " " + this->str + " = " + this->asts[1].cstring();
+        }
+        break;
+    }
+    case RETURN:
+        return indentStr + "return " + this->asts[0].cstring();
+        break;
+    case IDENTIFIER:
     case DIGITS:
         return this->str;
-        // break;
-    case ADD: 
-        return indentStr + this->asts[0].cstring() + " + " + this->asts[1].cstring();
-        // break;
+        break;
+    case ADD:
+        return this->asts[0].cstring() + " + " + this->asts[1].cstring();
+        break;
     case SUB: 
-        return indentStr + this->asts[0].cstring() + " - " + this->asts[1].cstring();
-        // break;
+        return this->asts[0].cstring() + " - " + this->asts[1].cstring();
+        break;
     case MUL: 
-        return indentStr + this->asts[0].cstring() + " * " + this->asts[1].cstring();
-        // break;
+        return this->asts[0].cstring() + " * " + this->asts[1].cstring();
+        break;
     case DIV: 
-        return indentStr + this->asts[0].cstring() + " / " + this->asts[1].cstring();
-        // break;
+        return this->asts[0].cstring() + " / " + this->asts[1].cstring();
+        break;
+    case MOD: 
+        return this->asts[0].cstring() + " % " + this->asts[1].cstring();
+        break;
+    case BIGGER: 
+        return this->asts[0].cstring() + " > " + this->asts[1].cstring();
+        break;
+    case SMALLER: 
+        return this->asts[0].cstring() + " < " + this->asts[1].cstring();
+        break;
+    case AND: 
+        return this->asts[0].cstring() + " && " + this->asts[1].cstring();
+        break;
+    case OR: 
+        return this->asts[0].cstring() + " || " + this->asts[1].cstring();
+        break;
+    case NOT: 
+        return "!" + this->asts[0].cstring();
+        break;
+    case EQUAL: 
+        return this->asts[0].cstring() + " == " + this->asts[1].cstring();
+        break;
     case FUNCTION: {
         std::string paramsStr, bodyStr;
         for (size_t index = 0; index < this->asts[0].asts.size(); ++index) {
             AST& param = this->asts[0].asts[index];
             AST& type = this->asts[2].asts[index];
-            paramsStr += typeToString(type.head.type) + ' ' + param.cstring() + ", ";
+            paramsStr += type.str + ' ' + param.cstring() + ", ";
         }
         if (!paramsStr.empty())
             paramsStr.pop_back(), paramsStr.pop_back(); // remove last ", "
         for (AST& stmt : this->asts[1].asts)
             bodyStr += stmt.cstring(indent + magical);
-        return indentStr + typeToString(this->asts[3].head.type) + " " + this->str + "(" + paramsStr + ") {\n" + bodyStr + indentStr + "}\n";
-        // break;
+        return indentStr +this->asts[3].str + " " + this->str + "(" + paramsStr + ") {\n" + bodyStr + indentStr + "\n}\n";
+        break;
     }
+    case FUNCTIONCALL: {
+        std::string paramsStr;
+        for (AST& param : this->asts[1].asts) {
+            paramsStr += param.cstring() + ", ";
+        }
+        if (!paramsStr.empty())
+            paramsStr.pop_back(), paramsStr.pop_back(); // remove last ", "
+        return indentStr + this->asts[0].cstring() + "(" + paramsStr + ")";
+        break;
+    }
+    case SEMICOLON:
+        return ";";
+        break;
     default:
         throw ASTError("Unknown AST type: " + std::to_string(this->head.type));
-        // break;
+        break;
     }
 }
 

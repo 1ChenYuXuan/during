@@ -134,11 +134,8 @@ static inline auto typeToken(const std::string& str) -> Type {
         if (newString == "END") return END;
         if (newString == "BIGGER") return BIGGER;
         if (newString == "SMALLER") return SMALLER;
-        if (newString == "EQUALS") return EQUALS;
         if (newString == "EQUAL") return EQUAL;
-        if (newString == "AND") return AND;
-        if (newString == "OR") return OR;
-        if (newString == "NOT") return NOT;
+        if (newString == "RETURN") return RETURN;
 
         if (newString == "(") return LEFT_PAREN;
         if (newString == ")") return RIGHT_PAREN;
@@ -153,14 +150,20 @@ static inline auto typeToken(const std::string& str) -> Type {
         if (newString == "/") return DIV;
         if (newString == "%") return MOD;
         if (newString == "@") return AT;
+        if (newString == "=") return EQUALS;
+        if (newString == "&") return AND;
+        if (newString == "|") return OR;
+        if (newString == "!") return NOT;
+        if (newString == "=") return EQUALS;
 
-        if (newString == "INT") return INT;
-        if (newString == "CHAR") return CHAR;
         if (newString == "FUNCTION") return FUNCTION;
     }
 
     if (isDigits(str)) return DIGITS;
+    // printf("%s\n", str.c_str());
     if (isIdentifier(str)) return IDENTIFIER;
+    // printf("%s\n", str.c_str());
+
     return UNKNOWN;
 }
 
@@ -186,7 +189,7 @@ static inline auto lexer(const std::string& str) -> Tokens {
                 buffer.clear();
             }
             continue;
-        } if (c == '(' || c == ')' || c == '{' || c == '}' || c == ';' || c == ',' || c == '+' || c == '-' || c == '*' || c == '/' || c == '@') {
+        } if (c == '(' || c == ')' || c == '{' || c == '}' || c == ';' || c == ',' || c == '+' || c == '-' || c == '*' || c == '/' || c == '@' || c == '=' || c == '%' || c == '&' || c == '|' || c == '!') {
             if (!buffer.empty()) {
                 tokens.push_back({typeToken(buffer), buffer});
                 buffer.clear();
@@ -203,7 +206,7 @@ static inline auto lexer(const std::string& str) -> Tokens {
     return tokens;
 }
 
-static inline auto parse(const Tokens& tokens) -> AST {
+static inline auto parse(const Tokens& tokens) -> std::string {
     struct Parser {
         const Tokens& tokens;
         size_t pos = 0;
@@ -226,76 +229,97 @@ static inline auto parse(const Tokens& tokens) -> AST {
 
         auto term() -> AST {
             if (match(DIGITS)) {
-                size_t num_pos = pos - 1;
-                return AST(HeadType{DIGITS}, tokens[num_pos].str, {});
-            }
-
-            if (match(IDENTIFIER))
-                return AST(HeadType{IDENTIFIER}, tokens[pos - 1].str, {});
-
-            if (match(INT)) {
-                if (!match(IDENTIFIER)) {
-                    throw TokenError("Expected identifier after INT");
-                }
-                std::string var_name = tokens[pos - 1].str;
-                AST val;
-                if (check(SEMICOLON)) {
+                std::string num = tokens[pos - 1].str;
+                AST num_node = AST(HeadType{DIGITS}, num, {});
+                if (check(ADD) || check(SUB) || check(MUL) || check(DIV) || check(MOD) ||
+                        check(BIGGER) || check(SMALLER) || check(AND) || check(OR) || check(NOT) || check(EQUAL)) {
+                    Type op = tokens[pos].head.type;
                     pos++;
-                    return AST(HeadType{INT}, "INT_DECL", {
-                        AST(HeadType{IDENTIFIER}, var_name, {}),
+                    return AST(HeadType{op}, "", {
+                        num_node,
+                        term()
                     });
                 }
-                if (match(EQUALS))
-                    val = expr();
-                if (!match(SEMICOLON))
-                    throw TokenError("Expected 'SEMICOLON' to end statement");
-                return AST(HeadType{EQUALS}, "INT_ASSIGN", {
-                    AST(HeadType{IDENTIFIER}, var_name, {}),
-                    val
-                });
+                return num_node;
             }
+            if (match(FUNCTION))
+                return parseFunction();
+            if (match(RETURN))
+                return AST(HeadType{RETURN}, "", {term()});
+            if (match(IDENTIFIER)) {
+                std::string num = tokens[pos - 1].str;
+                AST num_node = AST(HeadType{IDENTIFIER}, num, {});
+                if (check(ADD) || check(SUB) || check(MUL) || check(DIV) || check(MOD) ||
+                        check(BIGGER) || check(SMALLER) || check(AND) || check(OR) || check(NOT) || check(EQUAL)) {
+                    Type op = tokens[pos].head.type;
+                    pos++;
+                    return AST(HeadType{op}, "", {
+                        num_node,
+                        term()
+                    });
+                }
+                if (match(IDENTIFIER)) {
+                    std::string type = tokens[pos - 1].str;
+                    // pos++;
+                    // printf("Type: %d\n", tokens[pos].head.type);
+                    std::string name = tokens[pos - 2].str;
+                    
+                    if (match(SEMICOLON))
+                        return AST(HeadType{EQUALS}, type, {
+                            AST(HeadType{IDENTIFIER}, name, {})
+                        });
 
-            throw TokenError("Unexpected token");
-        }
+                    if (!match(EQUALS))
+                        throw TokenError("Expected '=' after type in variable declaration");
 
-        auto expr() -> AST {
-            AST left = term();
-            while (match(ADD) || match(SUB) || match(MUL) || match(DIV)) {
-                Type op = tokens[pos-1].head.type;
-                AST right = term();
-                left = AST(op, "OP", {left, right});
+                    // printAllTokens(tokens);
+                    AST expr = term();
+                    return AST(HeadType{EQUALS}, type, {
+                        AST(HeadType{IDENTIFIER}, name, {}),
+                        expr
+                    });
+                }
+                if (match(LEFT_PAREN)) {
+                    std::vector<AST> params;
+                    if (!check(RIGHT_PAREN)) {
+                        do {
+                            params.push_back(term());
+                        } while (match(COMMA));
+                    }
+                    if (!match(RIGHT_PAREN))
+                        throw TokenError("Expected ')'");
+                    // pos++;
+                    return AST(HeadType{FUNCTIONCALL}, tokens[pos - 2].str, {
+                        AST(HeadType{IDENTIFIER}, num, {}),
+                        AST(PARAMS, "", params)
+                    });
+                }
+                return num_node;
             }
-            return left;
-        }
-
-        auto checkType() -> Type {
-            if (check(INT)) return INT;
-            if (check(CHAR)) return CHAR;
-            if (check(FLOAT)) return FLOAT;
-            if (check(VOID)) return VOID;
-            throw TokenError("Expected type");
-        }
-
-        auto matchType() -> Type {
-            return checkType();
-            pos++;
+            if (match(LEFT_PAREN)) {
+                AST node = term();
+                if (!match(RIGHT_PAREN))
+                    throw TokenError("Expected ')'");
+                return node;
+            }
+            if (match(SEMICOLON))
+                return AST(HeadType{SEMICOLON}, "", {});
+            throw TokenError("Unexpected token: " + tokens[pos].str);
         }
 
         auto parseFunction() -> AST {
             if (!match(IDENTIFIER))
                 throw TokenError("Expected function name");
             std::string func_name = tokens[pos-1].str;
-            Type type = VOID;
-
+            std::string type = "void";
             if (!match(LEFT_PAREN))
                 throw TokenError("Expected '('");
-
             std::vector<AST> params, types, body;
             if (!match(RIGHT_PAREN)) {
                 do {
-                    matchType();
-                    Type type = tokens[pos-1].head.type;
-                    types.emplace_back(AST(HeadType{type}, "", {}));
+                    match(IDENTIFIER);
+                    std::string type = tokens[pos-1].str;
+                    types.emplace_back(AST(HeadType{IDENTIFIER}, type, {}));
                     // std::printf("%d\n", tokens[pos].head.type);
 
                     if (!match(IDENTIFIER))
@@ -307,47 +331,47 @@ static inline auto parse(const Tokens& tokens) -> AST {
                 if (!match(RIGHT_PAREN))
                     throw TokenError("Expected ')'");
             }
-
-            if (check(AT)) {
-                pos++;
-                type = matchType();
-                pos++;
-            }
-
+            if (match(AT))
+                type = match(IDENTIFIER) ? tokens[pos-1].str : "void";
             // printf("%d\n", tokens[pos-1].head.type);
-
             if (!match(LEFT_BRACE))
                 throw TokenError("Expected '{'");
-
-            while (!check(RIGHT_BRACE)) {
+            while (!check(RIGHT_BRACE))
                 body.push_back(term());
-            }
             match(RIGHT_BRACE);
-
             return AST(HeadType{FUNCTION}, func_name, {
                 AST(HeadType{PARAMS}, "", params),
                 AST(HeadType{BODY}, "", body),
                 AST(HeadType{TYPES}, "", types),
-                AST(HeadType{type}, "", {})
+                AST(HeadType{IDENTIFIER}, type, {})
             });
         }
     };
-
+    std::string code;
     Parser parser{tokens};
-    if (parser.match(FUNCTION)) {
-        return parser.parseFunction();
+    // It is that Python can teach me:
+    // while (true) {
+    //     try {
+    //         code += parser.term().cstring() + "\n";
+    //     } catch(...) {
+    //         break;
+    //     }
+    // }
+    // Who create for-loop to try-except in Python? It is too wried and slow.
+    while (parser.pos <= (tokens.size() - 1)) {
+        AST term = parser.term();
+        // printf("Term: %s\n", term.operator std::string().c_str());
+        code += term.cstring() + "\n";
     }
-    return parser.expr();
+    return code;
 }
 
 auto compiler(const std::string& str) -> std::string {
     Tokens tokens = lexer(str);
     // printAllTokens(tokens);
-    AST ast = parse(tokens);
-    std::string string = ast.cstring();
-    std::cout << std::string(ast) << std::endl;
-    std::cout << string << std::endl;
-    return string;
+    std::string astString = parse(tokens);
+    std::cout << astString << std::endl;
+    return astString;
 }
 
 auto usage(const std::string& path) -> void {
