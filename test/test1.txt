@@ -1,2 +1,2 @@
 
-INT a EQUALS 1 ADD 1 OVER
+Int a Equals 1 Add 1 Over

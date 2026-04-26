@@ -28,6 +28,7 @@
 #include <cstddef>
 #include <cctype>
 #include <cstdlib>
+#include <algorithm>
 
 using Tokens = std::vector<Token>;
 
@@ -99,28 +100,36 @@ static inline auto isWhites(const std::string& str) -> bool {
     return true;
 }
 
+static inline auto upper(std::string& str) -> void {
+    std::transform(str.begin(), str.end(), str.begin(), toupper);
+}
+
 static inline auto typeToken(const std::string& str) -> Type {
-    if (str == "IF") return IF;
-    if (str == "ELSE") return ELSE;
-    if (str == "END") return END;
-    if (str == "BIGGER") return BIGGER;
-    if (str == "SMALLER") return SMALLER;
-    if (str == "EQUALS") return EQUALS;
-    if (str == "EQUAL") return EQUAL;
-    if (str == "AND") return AND;
-    if (str == "OR") return OR;
-    if (str == "NOT") return NOT;
+    if (str.size() < 9) { // a small optimization for most tokens
+        std::string newString = str;
+        upper(newString);
+        if (newString == "IF") return IF;
+        if (newString == "ELSE") return ELSE;
+        if (newString == "END") return END;
+        if (newString == "BIGGER") return BIGGER;
+        if (newString == "SMALLER") return SMALLER;
+        if (newString == "EQUALS") return EQUALS;
+        if (newString == "EQUAL") return EQUAL;
+        if (newString == "AND") return AND;
+        if (newString == "OR") return OR;
+        if (newString == "NOT") return NOT;
 
-    if (str == "ADD") return ADD;
-    if (str == "SUB") return SUB;
-    if (str == "MUL") return MUL;
-    if (str == "DIV") return DIV;
-    if (str == "FLOORDIV") return FLOORDIV;
-    if (str == "MOD") return MOD;
+        if (newString == "ADD") return ADD;
+        if (newString == "SUB") return SUB;
+        if (newString == "MUL") return MUL;
+        if (newString == "DIV") return DIV;
+        if (newString == "FLOORDIV") return FLOORDIV;
+        if (newString == "MOD") return MOD;
 
-    if (str == "INT") return INT;
-    if (str == "CHAR") return CHAR;
-    if (str == "OVER") return OVER;
+        if (newString == "INT") return INT;
+        if (newString == "CHAR") return CHAR;
+        if (newString == "OVER") return OVER;
+    }
 
     if (isDigits(str)) return DIGITS;
     if (isIdentifier(str)) return IDENTIFIER;
@@ -128,7 +137,7 @@ static inline auto typeToken(const std::string& str) -> Type {
     return UNKNOWN;
 }
 
-auto lexer(const std::string& str) -> Tokens {
+static inline auto lexer(const std::string& str) -> Tokens {
     Tokens tokens;
     size_t line = 1;
     std::string buffer;
@@ -154,7 +163,7 @@ auto lexer(const std::string& str) -> Tokens {
     return tokens;
 }
 
-auto parse(const Tokens& tokens) -> AST {
+static inline auto parse(const Tokens& tokens) -> AST {
     struct Parser {
         const Tokens& tokens;
         size_t pos = 0;
