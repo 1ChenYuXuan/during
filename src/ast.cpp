@@ -46,18 +46,42 @@ auto AST::cstring(size_t indent) -> std::string const {
             return indentStr + "int " + this->asts[0].str + " = " + this->asts[1].cstring() + ";\n";
         else
             throw ASTError("Unknown INT AST type: " + this->str);
-        break;
+        // break;
     } case IDENTIFIER:
         return this->str;
-        break;
+        // break;
     case DIGITS:
         return this->str;
-        break;
+        // break;
     case ADD: 
         return indentStr + this->asts[0].cstring() + " + " + this->asts[1].cstring();
-        break;
+        // break;
+    case SUB: 
+        return indentStr + this->asts[0].cstring() + " - " + this->asts[1].cstring();
+        // break;
+    case MUL: 
+        return indentStr + this->asts[0].cstring() + " * " + this->asts[1].cstring();
+        // break;
+    case DIV: 
+        return indentStr + this->asts[0].cstring() + " / " + this->asts[1].cstring();
+        // break;
+    case FUNCTION: {
+        std::string paramsStr, bodyStr;
+        for (size_t index = 0; index < this->asts[0].asts.size(); ++index) {
+            AST& param = this->asts[0].asts[index];
+            AST& type = this->asts[2].asts[index];
+            paramsStr += typeToString(type.head.type) + ' ' + param.cstring() + ", ";
+        }
+        if (!paramsStr.empty())
+            paramsStr.pop_back(), paramsStr.pop_back(); // remove last ", "
+        for (AST& stmt : this->asts[1].asts)
+            bodyStr += stmt.cstring(indent + magical);
+        return indentStr + typeToString(this->asts[3].head.type) + " " + this->str + "(" + paramsStr + ") {\n" + bodyStr + indentStr + "}\n";
+        // break;
+    }
     default:
         throw ASTError("Unknown AST type: " + std::to_string(this->head.type));
+        // break;
     }
 }
 

@@ -42,7 +42,19 @@ public:
     }
 };
 
+class _FileError : public Exception {
+public:
+    _FileError(const std::string& msg, size_t line) {
+        this->name = "FileError";
+        this->msg = msg;
+        this->line = line;
+        this->throws();
+    }
+};
+
 #define TokenError(string) _TokenError(string, __LINE__)
+
+#define FileError(string) _FileError(string, __LINE__)
 
 static inline auto printAllTokens(const Tokens& tokens) -> void {
     for (const Token& token : tokens) {
@@ -60,6 +72,13 @@ static inline auto readAll(const std::string& filename) -> std::string {
     }
     return std::string(std::istreambuf_iterator<char>(ifs),
                        std::istreambuf_iterator<char>());
+}
+
+static inline auto saveAll(const std::string& filepath, const std::string& content) -> void {
+    std::ofstream ofs(filepath);
+    if (!ofs)
+        throw FileError("Failed to open file: " + filepath);
+    ofs << content;
 }
 
 static inline auto isDigits(const std::string& str) -> bool {
@@ -105,6 +124,8 @@ static inline auto upper(std::string& str) -> void {
 }
 
 static inline auto typeToken(const std::string& str) -> Type {
+    // printf("%s\n", str.c_str());
+
     if (str.size() < 9) { // a small optimization for most tokens
         std::string newString = str;
         upper(newString);
@@ -119,21 +140,27 @@ static inline auto typeToken(const std::string& str) -> Type {
         if (newString == "OR") return OR;
         if (newString == "NOT") return NOT;
 
-        if (newString == "ADD") return ADD;
-        if (newString == "SUB") return SUB;
-        if (newString == "MUL") return MUL;
-        if (newString == "DIV") return DIV;
-        if (newString == "FLOORDIV") return FLOORDIV;
-        if (newString == "MOD") return MOD;
+        if (newString == "(") return LEFT_PAREN;
+        if (newString == ")") return RIGHT_PAREN;
+        if (newString == "{") return LEFT_BRACE;
+        if (newString == "}") return RIGHT_BRACE;
+        if (newString == ";") return SEMICOLON;
+        if (newString == ",") return COMMA;
+
+        if (newString == "+") return ADD;
+        if (newString == "-") return SUB;
+        if (newString == "*") return MUL;
+        if (newString == "/") return DIV;
+        if (newString == "%") return MOD;
+        if (newString == "@") return AT;
 
         if (newString == "INT") return INT;
         if (newString == "CHAR") return CHAR;
-        if (newString == "OVER") return OVER;
+        if (newString == "FUNCTION") return FUNCTION;
     }
 
     if (isDigits(str)) return DIGITS;
     if (isIdentifier(str)) return IDENTIFIER;
-
     return UNKNOWN;
 }
 
@@ -158,6 +185,13 @@ static inline auto lexer(const std::string& str) -> Tokens {
                 tokens.push_back({typeToken(buffer), buffer});
                 buffer.clear();
             }
+            continue;
+        } if (c == '(' || c == ')' || c == '{' || c == '}' || c == ';' || c == ',' || c == '+' || c == '-' || c == '*' || c == '/' || c == '@') {
+            if (!buffer.empty()) {
+                tokens.push_back({typeToken(buffer), buffer});
+                buffer.clear();
+            }
+            tokens.push_back({typeToken(std::string(1, c)), std::string(1, c)});
             continue;
         }
         buffer += c;
@@ -184,102 +218,136 @@ static inline auto parse(const Tokens& tokens) -> AST {
             return false;
         }
 
-        auto skip(Type type) -> void {
-            while (match(type));
+        auto check(Type type) -> bool {
+            if (pos >= tokens.size())
+                return false;
+            return tokens[pos].head.type == type;
         }
 
         auto term() -> AST {
             if (match(DIGITS)) {
                 size_t num_pos = pos - 1;
-                
-                if (match(MUL)) {
-                    return AST(HeadType{MUL}, "MUL", {
-                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
-                        term()
-                    });
-                }
-                if (match(DIV)) {
-                    return AST(HeadType{DIV}, "DIV", {
-                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
-                        term()
-                    });
-                }
-                if (match(ADD)) {
-                    return AST(HeadType{ADD}, "ADD", {
-                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
-                        term()
-                    });
-                }
-                if (match(SUB)) {
-                    return AST(HeadType{SUB}, "SUB", {
-                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
-                        term()
-                    });
-                }
-                if (match(FLOORDIV)) {
-                    return AST(HeadType{FLOORDIV}, "FLOORDIV", {
-                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
-                        term()
-                    });
-                }
-                if (match(MOD)) {
-                    return AST(HeadType{MOD}, "MOD", {
-                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
-                        term()
-                    });
-                }
-
                 return AST(HeadType{DIGITS}, tokens[num_pos].str, {});
             }
 
             if (match(IDENTIFIER))
                 return AST(HeadType{IDENTIFIER}, tokens[pos - 1].str, {});
+
             if (match(INT)) {
                 if (!match(IDENTIFIER)) {
                     throw TokenError("Expected identifier after INT");
                 }
                 std::string var_name = tokens[pos - 1].str;
-
-                // int a = 123
-                if (match(EQUALS)) {
-                    AST expr = term();
-                    if (match(OVER)) {
-                        return AST(HeadType{EQUALS}, "INT_ASSIGN", {
-                            AST(HeadType{IDENTIFIER}, var_name, {}),
-                            expr
-                        });
-                    }
-                }
-
-                // int a;
-                if (match(OVER)) {
-                    return AST(HeadType{EQUALS}, "INT_DECL", {
-                        AST(HeadType{IDENTIFIER}, var_name, {})
+                AST val;
+                if (check(SEMICOLON)) {
+                    pos++;
+                    return AST(HeadType{INT}, "INT_DECL", {
+                        AST(HeadType{IDENTIFIER}, var_name, {}),
                     });
                 }
-
-                throw TokenError("Expected end of statement after INT definition");
+                if (match(EQUALS))
+                    val = expr();
+                if (!match(SEMICOLON))
+                    throw TokenError("Expected 'SEMICOLON' to end statement");
+                return AST(HeadType{EQUALS}, "INT_ASSIGN", {
+                    AST(HeadType{IDENTIFIER}, var_name, {}),
+                    val
+                });
             }
 
-            throw TokenError("Unexpected token: " + tokens[pos].str);
+            throw TokenError("Unexpected token");
         }
 
         auto expr() -> AST {
-            return term();
+            AST left = term();
+            while (match(ADD) || match(SUB) || match(MUL) || match(DIV)) {
+                Type op = tokens[pos-1].head.type;
+                AST right = term();
+                left = AST(op, "OP", {left, right});
+            }
+            return left;
+        }
+
+        auto checkType() -> Type {
+            if (check(INT)) return INT;
+            if (check(CHAR)) return CHAR;
+            if (check(FLOAT)) return FLOAT;
+            if (check(VOID)) return VOID;
+            throw TokenError("Expected type");
+        }
+
+        auto matchType() -> Type {
+            return checkType();
+            pos++;
+        }
+
+        auto parseFunction() -> AST {
+            if (!match(IDENTIFIER))
+                throw TokenError("Expected function name");
+            std::string func_name = tokens[pos-1].str;
+            Type type = VOID;
+
+            if (!match(LEFT_PAREN))
+                throw TokenError("Expected '('");
+
+            std::vector<AST> params, types, body;
+            if (!match(RIGHT_PAREN)) {
+                do {
+                    matchType();
+                    Type type = tokens[pos-1].head.type;
+                    types.emplace_back(AST(HeadType{type}, "", {}));
+                    // std::printf("%d\n", tokens[pos].head.type);
+
+                    if (!match(IDENTIFIER))
+                        throw TokenError("Expected parameter name");
+                    params.emplace_back(HeadType{IDENTIFIER}, tokens[pos-1].str, ASTs{});
+
+                } while (match(COMMA));
+
+                if (!match(RIGHT_PAREN))
+                    throw TokenError("Expected ')'");
+            }
+
+            if (check(AT)) {
+                pos++;
+                type = matchType();
+                pos++;
+            }
+
+            // printf("%d\n", tokens[pos-1].head.type);
+
+            if (!match(LEFT_BRACE))
+                throw TokenError("Expected '{'");
+
+            while (!check(RIGHT_BRACE)) {
+                body.push_back(term());
+            }
+            match(RIGHT_BRACE);
+
+            return AST(HeadType{FUNCTION}, func_name, {
+                AST(HeadType{PARAMS}, "", params),
+                AST(HeadType{BODY}, "", body),
+                AST(HeadType{TYPES}, "", types),
+                AST(HeadType{type}, "", {})
+            });
         }
     };
 
     Parser parser{tokens};
+    if (parser.match(FUNCTION)) {
+        return parser.parseFunction();
+    }
     return parser.expr();
 }
 
 auto compiler(const std::string& str) -> std::string {
     Tokens tokens = lexer(str);
-    printAllTokens(tokens);
+    // printAllTokens(tokens);
     AST ast = parse(tokens);
+    std::string string = ast.cstring();
     std::cout << std::string(ast) << std::endl;
-    std::cout << ast.cstring() << std::endl;
-    return "Compile finished.\n";
+    std::cout << string << std::endl;
+    return string;
 }
 
 auto usage(const std::string& path) -> void {
@@ -297,11 +365,19 @@ auto main(int argc, char** _argv) -> int {
 
     bool isCompile = false;
     std::string inputFile;
+    std::string outputFile = "a.out";
 
     for (size_t index = 1; index < argv.size(); ++index) {
         auto& str = argv[index];
         if (str == "-c")
             isCompile = true;
+        if (str == "-o") {
+            if (index + 1 >= argv.size()) {
+                std::cerr << "Expected output file after -o\n";
+                usage(argv[0]);
+            }
+            outputFile = argv[++index];
+        }
         else
             inputFile = str;
     }
@@ -311,7 +387,8 @@ auto main(int argc, char** _argv) -> int {
 
     std::string str = readAll(inputFile);
     if (isCompile) {
-        compiler(str);
+        std::string string = compiler(str);
+        saveAll(outputFile, string);
     } else
         TODO("Else");
 

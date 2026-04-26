@@ -1,2 +1,4 @@
 
-Int a Equals 1 Add 1 Over
+Function main() @ int {
+    Int a Equals 1 + 1 ;
+}

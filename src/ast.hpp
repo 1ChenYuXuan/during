@@ -25,14 +25,25 @@
 #include <string>
 #include <vector>
 
+static const auto magical = 4;
+
 enum Type: uint16_t {
     IF, ELSE,
     DIGITS,
     IDENTIFIER,
     END,
     BIGGER, SMALLER, EQUALS, EQUAL, AND, OR, NOT,
-    ADD, SUB, MUL, DIV, FLOORDIV, MOD,
-    INT, CHAR, FLOAT, OVER,
+    ADD, SUB, MUL, DIV, MOD,
+    INT, CHAR, FLOAT, VOID,
+    FUNCTION,
+    LEFT_PAREN,
+    RIGHT_PAREN,
+    LEFT_BRACE,
+    RIGHT_BRACE,
+    SEMICOLON,
+    COMMA,
+    PARAMS, BODY, TYPES,
+    AT,
     UNKNOWN
 };
 
@@ -73,5 +84,16 @@ public:
     auto operator[] (size_t index) -> AST&; // for ast[i]
     auto operator* () -> HeadType&; // for ast->type
 };
+
+static inline auto typeToString(Type type) -> std::string {
+    switch (type) {
+    case INT: return "int";
+    case CHAR: return "char";
+    case FLOAT: return "float";
+    case VOID: return "void";
+    default:
+        throw ASTError("Unknown type: " + std::to_string(type));
+    }
+}
 
 using ASTs = std::vector<AST>;
