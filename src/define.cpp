@@ -25,4 +25,5 @@ _TODOError::_TODOError(const std::string& msg, size_t line) {
     this->name = "TODOError";
     this->msg = msg;
     this->line = line;
+    this->throws();
 }

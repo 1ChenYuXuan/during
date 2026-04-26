@@ -1,10 +1,9 @@
-
 // Copyright (c) 2026 Chen Yuxuan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// to use, copy, modify, merge, publish, distribute, sublicense,/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
@@ -28,21 +27,38 @@
 #include <vector>
 #include <cstddef>
 #include <cctype>
+#include <cstdlib>
 
 using Tokens = std::vector<Token>;
 
+class _TokenError : public Exception {
+public:
+    _TokenError(const std::string& msg, size_t line) {
+        this->name = "TokenError";
+        this->msg = msg;
+        this->line = line;
+        this->throws();
+    }
+};
+
+#define TokenError(string) _TokenError(string, __LINE__)
+
 static inline auto printAllTokens(const Tokens& tokens) -> void {
-    for (Token token : tokens) {
+    for (const Token& token : tokens) {
         std::cout << "Type: " << token.head.type << "\n";
-        std::cout << "Str : " << token.str << "\n";
+        std::cout << "Str : " << token.str << "\n\n";
     }
     std::cout << std::flush;
 }
 
 static inline auto readAll(const std::string& filename) -> std::string {
     std::ifstream ifs(filename);
+    if (!ifs) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        exit(EXIT_FAILURE);
+    }
     return std::string(std::istreambuf_iterator<char>(ifs),
-                       std::istreambuf_iterator<char>(  ));
+                       std::istreambuf_iterator<char>());
 }
 
 static inline auto isDigits(const std::string& str) -> bool {
@@ -50,30 +66,30 @@ static inline auto isDigits(const std::string& str) -> bool {
     for (char c : str)
         if (!isdigit(static_cast<unsigned char>(c)))
             return false;
-
     return true;
 }
 
-static inline auto isIderChar(const char c) -> bool {
-    return isIderCharExceptNumber(c) || ('0' < c && c < '9');
+static inline auto isIderCharExceptNumber(const char c) -> bool {
+    return (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
+            c == '_' || c == '<' || c == '>' || c == '=' || c == '$');
 }
 
-static inline auto isIderCharExceptNumber(const char c) -> bool {
-    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || c == '_' || c == '<' || c == '>' || c == '=' || c == '!=' || c == '$';
+static inline auto isIderChar(const char c) -> bool {
+    return isIderCharExceptNumber(c) || isdigit(static_cast<unsigned char>(c));
 }
 
 static inline auto isIdentifier(const std::string& str) -> bool {
+    if (str.empty()) return false;
     if (!isIderCharExceptNumber(str[0]))
         return false;
-    for (size_t i = 0; i < str.size(); ++i)
+    for (size_t i = 1; i < str.size(); ++i)
         if (!isIderChar(str[i]))
             return false;
-
     return true;
 }
 
 static inline auto isWhite(const char c) -> bool {
-    return isspace(c);
+    return isspace(static_cast<unsigned char>(c));
 }
 
 static inline auto isWhites(const std::string& str) -> bool {
@@ -87,7 +103,6 @@ static inline auto typeToken(const std::string& str) -> Type {
     if (str == "IF") return IF;
     if (str == "ELSE") return ELSE;
     if (str == "END") return END;
-    // For BIGGER, SMALLER, EQUALS, EQUAL, AND, OR and NOT
     if (str == "BIGGER") return BIGGER;
     if (str == "SMALLER") return SMALLER;
     if (str == "EQUALS") return EQUALS;
@@ -96,6 +111,17 @@ static inline auto typeToken(const std::string& str) -> Type {
     if (str == "OR") return OR;
     if (str == "NOT") return NOT;
 
+    if (str == "ADD") return ADD;
+    if (str == "SUB") return SUB;
+    if (str == "MUL") return MUL;
+    if (str == "DIV") return DIV;
+    if (str == "FLOORDIV") return FLOORDIV;
+    if (str == "MOD") return MOD;
+
+    if (str == "INT") return INT;
+    if (str == "CHAR") return CHAR;
+    if (str == "OVER") return OVER;
+
     if (isDigits(str)) return DIGITS;
     if (isIdentifier(str)) return IDENTIFIER;
 
@@ -103,53 +129,147 @@ static inline auto typeToken(const std::string& str) -> Type {
 }
 
 auto lexer(const std::string& str) -> Tokens {
-    Tokens tokens = Tokens();
+    Tokens tokens;
     size_t line = 1;
-    char c;
     std::string buffer;
 
-    for (auto begin = str.begin(), end = str.end(); begin < end;) {
-        c = *begin;
-
+    for (char c : str) {
         if (c == '\n') {
             line++;
-            begin++;
             continue;
         }
-
         if (isWhite(c)) {
             if (!buffer.empty()) {
-                tokens.push_back({{typeToken(buffer)}, buffer});
+                tokens.push_back({typeToken(buffer), buffer});
                 buffer.clear();
             }
-            begin++;
             continue;
         }
-
-        buffer.push_back(c);
-        begin++;
+        buffer += c;
     }
 
     if (!buffer.empty())
-        tokens.push_back({{typeToken(buffer)}, buffer});
+        tokens.push_back({typeToken(buffer), buffer});
 
     return tokens;
 }
 
 auto parse(const Tokens& tokens) -> AST {
-    // TODO: finish parser
-    return AST();
+    struct Parser {
+        const Tokens& tokens;
+        size_t pos = 0;
+
+        auto match(Type type) -> bool {
+            if (pos >= tokens.size())
+                return false;
+            if (tokens[pos].head.type == type) {
+                pos++;
+                return true;
+            }
+            return false;
+        }
+
+        auto skip(Type type) -> void {
+            while (match(type));
+        }
+
+        auto term() -> AST {
+            if (match(DIGITS)) {
+                size_t num_pos = pos - 1;
+                
+                if (match(MUL)) {
+                    return AST(HeadType{MUL}, "MUL", {
+                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
+                        term()
+                    });
+                }
+                if (match(DIV)) {
+                    return AST(HeadType{DIV}, "DIV", {
+                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
+                        term()
+                    });
+                }
+                if (match(ADD)) {
+                    return AST(HeadType{ADD}, "ADD", {
+                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
+                        term()
+                    });
+                }
+                if (match(SUB)) {
+                    return AST(HeadType{SUB}, "SUB", {
+                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
+                        term()
+                    });
+                }
+                if (match(FLOORDIV)) {
+                    return AST(HeadType{FLOORDIV}, "FLOORDIV", {
+                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
+                        term()
+                    });
+                }
+                if (match(MOD)) {
+                    return AST(HeadType{MOD}, "MOD", {
+                        AST(HeadType{DIGITS}, tokens[num_pos].str, {}),
+                        term()
+                    });
+                }
+
+                return AST(HeadType{DIGITS}, tokens[num_pos].str, {});
+            }
+
+            if (match(IDENTIFIER))
+                return AST(HeadType{IDENTIFIER}, tokens[pos - 1].str, {});
+            if (match(INT)) {
+                if (!match(IDENTIFIER)) {
+                    throw TokenError("Expected identifier after INT");
+                }
+                std::string var_name = tokens[pos - 1].str;
+
+                // int a = 123
+                if (match(EQUALS)) {
+                    AST expr = term();
+                    if (match(OVER)) {
+                        return AST(HeadType{EQUALS}, "INT_ASSIGN", {
+                            AST(HeadType{IDENTIFIER}, var_name, {}),
+                            expr
+                        });
+                    }
+                }
+
+                // int a;
+                if (match(OVER)) {
+                    return AST(HeadType{EQUALS}, "INT_DECL", {
+                        AST(HeadType{IDENTIFIER}, var_name, {})
+                    });
+                }
+
+                throw TokenError("Expected end of statement after INT definition");
+            }
+
+            throw TokenError("Unexpected token: " + tokens[pos].str);
+        }
+
+        auto expr() -> AST {
+            return term();
+        }
+    };
+
+    Parser parser{tokens};
+    return parser.expr();
 }
 
 auto compiler(const std::string& str) -> std::string {
     Tokens tokens = lexer(str);
+    printAllTokens(tokens);
     AST ast = parse(tokens);
-    return "";
+    std::cout << std::string(ast) << std::endl;
+    std::cout << ast.cstring() << std::endl;
+    return "Compile finished.\n";
 }
 
 auto usage(const std::string& path) -> void {
     std::cout << "Usage: " << path << " -c input.txt\n";
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 auto main(int argc, char** _argv) -> int {
@@ -176,8 +296,7 @@ auto main(int argc, char** _argv) -> int {
 
     std::string str = readAll(inputFile);
     if (isCompile) {
-        Tokens tokens = lexer(str);
-        printAllTokens(tokens);
+        compiler(str);
     } else
         TODO("Else");
 

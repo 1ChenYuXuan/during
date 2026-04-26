@@ -21,9 +21,54 @@
 
 #include "./ast.hpp"
 
-AST::AST(HeadType& head, ASTs& asts) {
+_ASTError::_ASTError(const std::string& msg, size_t line) {
+    this->name = "ASTError";
+    this->msg = msg;
+    this->line = line;
+    this->throws();
+}
+
+AST::AST(const HeadType& head, const std::string& str, const ASTs& asts) {
     this->head = head;
+    this->str = str;
     this->asts = asts;
+}
+
+auto AST::cstring(size_t indent) -> std::string const {
+    std::string indentStr;
+    for (size_t i = 0; i < indent; ++i)
+        indentStr += ' ';
+    switch (this->head.type) {
+    case EQUALS: {
+        if (this->str == "INT_DECL")
+            return indentStr + "int " + this->asts[0].str + ";\n" ;
+        else if (this->str == "INT_ASSIGN")
+            return indentStr + "int " + this->asts[0].str + " = " + this->asts[1].cstring() + ";\n";
+        else
+            throw ASTError("Unknown INT AST type: " + this->str);
+        break;
+    } case IDENTIFIER:
+        return this->str;
+        break;
+    case DIGITS:
+        return this->str;
+        break;
+    case ADD: 
+        return indentStr + this->asts[0].cstring() + " + " + this->asts[1].cstring();
+        break;
+    default:
+        throw ASTError("Unknown AST type: " + std::to_string(this->head.type));
+    }
+}
+
+AST::operator std::string() const {
+    std::string result = "AST(" + std::to_string(this->head.type) + ", " + this->str + ", [";
+    for (const AST& ast : this->asts)
+        result += std::string(ast) + ", ";
+    if (!this->asts.empty())
+        result.pop_back(), result.pop_back(); // remove last ", "
+    result += "])";
+    return result;
 }
 
 auto AST::operator[] (size_t index) -> AST& {

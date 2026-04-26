@@ -29,13 +29,19 @@ enum Type: uint16_t {
     IF, ELSE,
     DIGITS,
     IDENTIFIER,
-    END, 
+    END,
     BIGGER, SMALLER, EQUALS, EQUAL, AND, OR, NOT,
+    ADD, SUB, MUL, DIV, FLOORDIV, MOD,
+    INT, CHAR, FLOAT, OVER,
     UNKNOWN
 };
 
 struct HeadType {
     Type type;
+    HeadType() = default;
+    HeadType(Type type) {
+        this->type = type;
+    }
 };
 
 struct Token {
@@ -43,18 +49,27 @@ struct Token {
     std::string str;
 };
 
+class _ASTError : public Exception {
+public:
+    _ASTError(const std::string& msg, size_t line);
+};
+
+#define ASTError(string) _ASTError(string, __LINE__)
+
 class AST {
 using ASTs = std::vector<AST>;
 // public: // ALL PUBLIC
 private:
     HeadType head;
+    std::string str;
     ASTs asts;
 public:
     AST() = default;
-    AST(HeadType& head, ASTs&); // not constant
+    AST(const HeadType&, const std::string&, const ASTs&); // not constant
 
-    // TODO: skip, match, term, expr
+    auto cstring(size_t indent=0) -> std::string const;
 
+    operator std::string() const;
     auto operator[] (size_t index) -> AST&; // for ast[i]
     auto operator* () -> HeadType&; // for ast->type
 };
