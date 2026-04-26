@@ -71,8 +71,8 @@ static inline auto isDigits(const std::string& str) -> bool {
 }
 
 static inline auto isIderCharExceptNumber(const char c) -> bool {
-    return (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
-            c == '_' || c == '<' || c == '>' || c == '=' || c == '$');
+    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
+            c == '_';
 }
 
 static inline auto isIderChar(const char c) -> bool {
@@ -139,12 +139,18 @@ static inline auto typeToken(const std::string& str) -> Type {
 
 static inline auto lexer(const std::string& str) -> Tokens {
     Tokens tokens;
+#ifdef NEED_LINE
     size_t line = 1;
+#endif
     std::string buffer;
-
+    buffer.reserve(64); // a small optimization for most tokens
+    tokens.reserve(str.size() / 10 + 10); // a small optimization for most tokens
+    
     for (char c : str) {
         if (c == '\n') {
+#ifdef NEED_LINE
             line++;
+#endif
             continue;
         }
         if (isWhite(c)) {
