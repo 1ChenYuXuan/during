@@ -28,11 +28,13 @@
 static const auto magical = 4;
 
 enum Type: uint16_t {
-    IF, ELSE,
+    IF, ELSE, EXPR,
     DIGITS,
     IDENTIFIER,
     END,
     BIGGER, SMALLER, EQUALS, EQUAL, AND, OR, NOT,
+    BIGGER_EQUAL, SMALLER_EQUAL, NOT_EQUAL,
+    EACH_AND, EACH_OR, EACH_NOT, EACH_XOR,
     ADD, SUB, MUL, DIV, MOD,
     FUNCTION,
     LEFT_PAREN,

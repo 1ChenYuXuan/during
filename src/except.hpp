@@ -31,4 +31,5 @@ public:  // ALL public
     size_t line;
 
     std::string throws() const;
+    std::string what() const;
 };

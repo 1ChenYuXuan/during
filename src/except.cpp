@@ -22,8 +22,13 @@
 #include "./except.hpp"
 
 auto Exception::throws() const -> std::string {
-    std::string temp = std::string("Throwed ") + "in line " + std::to_string(this->line) + "\n" + 
-        "ERROR " + this->name + " : " + this->msg;
+    std::string temp = this->what();
     std::cerr << temp << std::endl;
+    return temp;
+}
+
+auto Exception::what() const -> std::string {
+    std::string temp = std::string("Throwed ") + "in line " + std::to_string(this->line) + "\n" + 
+        "ERROR " + this->name + " : \033[31m" + this->msg + "\033[0m";
     return temp;
 }

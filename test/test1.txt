@@ -1,8 +1,16 @@
 
-function add(int a, int b) @int {
-    return a + b;
+int c = 1;
+
+function main() @int {
+    if (c) {
+        return 1;
+    }
+    return 0;
 }
 
 function main() @int {
-    int a = add(1, 1);
+    if (c) {
+        return 1;
+    }
+    return 0;
 }

@@ -41,14 +41,14 @@ auto AST::cstring(size_t indent) -> std::string const {
     switch (this->head.type) {
     case EQUALS: {
         if (this->asts.size() == 1) {
-            return indentStr + this->asts[0].cstring() + " " + this->str;
+            return indentStr + this->asts[0].cstring() + " " + this->str + ";";
         } else {
-            return indentStr + this->asts[0].cstring() + " " + this->str + " = " + this->asts[1].cstring();
+            return indentStr + this->asts[0].cstring() + " " + this->str + " = " + this->asts[1].cstring() + ";";
         }
         break;
     }
     case RETURN:
-        return indentStr + "return " + this->asts[0].cstring();
+        return indentStr + "return " + this->asts[0].cstring() + ";";
         break;
     case IDENTIFIER:
     case DIGITS:
@@ -87,6 +87,41 @@ auto AST::cstring(size_t indent) -> std::string const {
     case EQUAL: 
         return this->asts[0].cstring() + " == " + this->asts[1].cstring();
         break;
+    case NOT_EQUAL: 
+        return this->asts[0].cstring() + " != " + this->asts[1].cstring();
+        break;
+    case BIGGER_EQUAL: 
+        return this->asts[0].cstring() + " >= " + this->asts[1].cstring();
+        break;
+    case SMALLER_EQUAL: 
+        return this->asts[0].cstring() + " <= " + this->asts[1].cstring();
+        break;
+    case EACH_OR: 
+        return this->asts[0].cstring() + " | " + this->asts[1].cstring();
+        break;
+    case EACH_AND: 
+        return this->asts[0].cstring() + " & " + this->asts[1].cstring();
+        break;
+    case EACH_NOT: 
+        return this->asts[0].cstring() + " ~ " + this->asts[1].cstring();
+        break;
+    case EACH_XOR: 
+        return this->asts[0].cstring() + " ^" + this->asts[1].cstring();
+        break;
+    case LEFT_PAREN:
+        return "(" + this->asts[0].cstring() + ")";
+    case IF: {
+        std::string bodyStr;
+        for (AST& stmt : this->asts[1].asts)
+            bodyStr += stmt.cstring(indent + magical);
+        return indentStr + "if (" + this->asts[0].asts[0].cstring() + ") {\n" + bodyStr + "\n" + indentStr + "}\n";
+    }
+    case ELSE: {
+        std::string bodyStr;
+        for (AST& stmt : this->asts[0].asts)
+            bodyStr += stmt.cstring(indent + magical);
+        return indentStr + "else {\n" + bodyStr + "\n" + indentStr + "}\n";
+    }
     case FUNCTION: {
         std::string paramsStr, bodyStr;
         for (size_t index = 0; index < this->asts[0].asts.size(); ++index) {
