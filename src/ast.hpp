@@ -28,7 +28,7 @@
 static const auto magical = 4;
 
 enum Type: uint16_t {
-    IF, ELSE, EXPR,
+    IF, ELSE, EXPR, WHILE, ELIF,
     DIGITS,
     IDENTIFIER,
     END,
@@ -44,7 +44,11 @@ enum Type: uint16_t {
     SEMICOLON,
     COMMA, FUNCTIONCALL,
     PARAMS, BODY, TYPES,
-    AT, RETURN,
+    AT, RETURN, UNAT,
+    INCLUDE,
+    // ONE, TWO,
+    STRING, CHAR,
+    LINESEP,
     UNKNOWN
 };
 

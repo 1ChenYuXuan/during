@@ -1,16 +1,10 @@
 
-int c = 1;
+include "stdio.h";
 
 function main() @int {
-    if (c) {
-        return 1;
-    }
-    return 0;
-}
-
-function main() @int {
-    if (c) {
-        return 1;
+    while(1) {}
+    if (1) {
+        printf("Hello, world\n");
     }
     return 0;
 }

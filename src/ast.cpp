@@ -39,6 +39,8 @@ auto AST::cstring(size_t indent) -> std::string const {
     for (size_t i = 0; i < indent; ++i)
         indentStr += ' ';
     switch (this->head.type) {
+    case LINESEP:
+        return "\n";
     case EQUALS: {
         if (this->asts.size() == 1) {
             return indentStr + this->asts[0].cstring() + " " + this->str + ";";
@@ -47,12 +49,24 @@ auto AST::cstring(size_t indent) -> std::string const {
         }
         break;
     }
+    case INCLUDE:
+        if (this->asts[0].head.type == AT)
+            return "#include \"" + this->str + "\"";
+        else
+            return "#include <" + this->str + ">";
+        break;
     case RETURN:
         return indentStr + "return " + this->asts[0].cstring() + ";";
         break;
     case IDENTIFIER:
     case DIGITS:
         return this->str;
+        break;
+    case STRING:
+        return "\"" + this->str + "\"";
+        break;
+    case CHAR:
+        return "'" + this->str + "'";
         break;
     case ADD:
         return this->asts[0].cstring() + " + " + this->asts[1].cstring();
@@ -114,13 +128,25 @@ auto AST::cstring(size_t indent) -> std::string const {
         std::string bodyStr;
         for (AST& stmt : this->asts[1].asts)
             bodyStr += stmt.cstring(indent + magical);
-        return indentStr + "if (" + this->asts[0].asts[0].cstring() + ") {\n" + bodyStr + "\n" + indentStr + "}\n";
+        return indentStr + "if (" + this->asts[0].asts[0].cstring() + ") {" + bodyStr + indentStr + "}";
+    }
+    case WHILE: {
+        std::string bodyStr;
+        for (AST& stmt : this->asts[1].asts)
+            bodyStr += stmt.cstring(indent + magical);
+        return indentStr + "while (" + this->asts[0].asts[0].cstring() + ") {" + bodyStr + indentStr + "}";
+    }
+    case ELIF: {
+        std::string bodyStr;
+        for (AST& stmt : this->asts[1].asts)
+            bodyStr += stmt.cstring(indent + magical);
+        return indentStr + "else if (" + this->asts[0].asts[0].cstring() + ") {" + bodyStr + indentStr + "}";
     }
     case ELSE: {
         std::string bodyStr;
         for (AST& stmt : this->asts[0].asts)
             bodyStr += stmt.cstring(indent + magical);
-        return indentStr + "else {\n" + bodyStr + "\n" + indentStr + "}\n";
+        return indentStr + "else {" + bodyStr + indentStr + "}";
     }
     case FUNCTION: {
         std::string paramsStr, bodyStr;
@@ -133,17 +159,16 @@ auto AST::cstring(size_t indent) -> std::string const {
             paramsStr.pop_back(), paramsStr.pop_back(); // remove last ", "
         for (AST& stmt : this->asts[1].asts)
             bodyStr += stmt.cstring(indent + magical);
-        return indentStr +this->asts[3].str + " " + this->str + "(" + paramsStr + ") {\n" + bodyStr + indentStr + "\n}\n";
+        return indentStr +this->asts[3].str + " " + this->str + "(" + paramsStr + ") {" + bodyStr + indentStr + "}";
         break;
     }
     case FUNCTIONCALL: {
         std::string paramsStr;
-        for (AST& param : this->asts[1].asts) {
+        for (AST& param : this->asts[1].asts)
             paramsStr += param.cstring() + ", ";
-        }
         if (!paramsStr.empty())
             paramsStr.pop_back(), paramsStr.pop_back(); // remove last ", "
-        return indentStr + this->asts[0].cstring() + "(" + paramsStr + ")";
+        return indentStr + this->asts[0].cstring() + "(" + paramsStr + ")" + this->asts[1].str;
         break;
     }
     case SEMICOLON:

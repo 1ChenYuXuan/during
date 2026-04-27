@@ -138,6 +138,9 @@ static inline auto typeToken(const std::string& str) -> Type {
         if (newString == "SMALLER") return SMALLER;
         if (newString == "EQUAL") return EQUAL;
         if (newString == "RETURN") return RETURN;
+        if (newString == "INCLUDE") return INCLUDE;
+        if (newString == "WHILE") return WHILE;
+        if (newString == "ELIF") return ELIF;
 
         if (newString == "(") return LEFT_PAREN;
         if (newString == ")") return RIGHT_PAREN;
@@ -189,100 +192,139 @@ static inline auto lexer(const std::string& str) -> Tokens {
     auto it = str.cbegin();
     const auto end = str.cend();
 
+    bool isString = false;
+    bool isChar = false;
+
     for (; it != end; ++it) {
         char c = *it;
+
         if (c == '\n') {
 #ifdef NEED_LINE
             ++line;
 #endif
+            if (isString || isChar)
+                throw TokenError("unclosed string/char");
+
             if (!buffer.empty()) {
-                tokens.emplace_back(Token{typeToken(buffer), buffer});
+                tokens.emplace_back(Token{typeToken(buffer), std::move(buffer)});
                 buffer.clear();
             }
-            continue;
-        }
-        if (isWhite(c)) {
-            if (!buffer.empty()) {
-                tokens.emplace_back(Token{typeToken(buffer), buffer});
-                buffer.clear();
-            }
+            tokens.emplace_back(Token{LINESEP, ""});
             continue;
         }
 
-        if (it + 1 != end) {
-            char nc = *(it + 1);
-            switch (c) {
-                case '=':
-                    if (nc == '=') {
-                        if (!buffer.empty()) { tokens.emplace_back(Token{typeToken(buffer), buffer}); buffer.clear(); }
-                        tokens.emplace_back(Token{typeToken("=="), "=="});
-                        ++it;
-                        continue;
-                    }
-                    break;
-                case '!':
-                    if (nc == '=') {
-                        if (!buffer.empty()) { tokens.emplace_back(Token{typeToken(buffer), buffer}); buffer.clear(); }
-                        tokens.emplace_back(Token{typeToken("!="), "!="});
-                        ++it;
-                        continue;
-                    }
-                    break;
-                case '&':
-                    if (nc == '&') {
-                        if (!buffer.empty()) { tokens.emplace_back(Token{typeToken(buffer), buffer}); buffer.clear(); }
-                        tokens.emplace_back(Token{typeToken("&&"), "&&"});
-                        ++it;
-                        continue;
-                    }
-                    break;
-                case '|':
-                    if (nc == '|') {
-                        if (!buffer.empty()) { tokens.emplace_back(Token{typeToken(buffer), buffer}); buffer.clear(); }
-                        tokens.emplace_back(Token{typeToken("||"), "||"});
-                        ++it;
-                        continue;
-                    }
-                    break;
-                case '+': case '-': case '*': case '/': case '%':
-                    if (nc == '=') {
-                        std::string op(1, c); op += '=';
-                        if (!buffer.empty()) { tokens.emplace_back(Token{typeToken(buffer), buffer}); buffer.clear(); }
-                        tokens.emplace_back(Token{typeToken(op), op});
-                        ++it;
-                        continue;
-                    }
-                    break;
-                default: break;
-            }
-        }
-
-        static const char* singleOps = "(){};,+-*/@=%&|!";
-        if (strchr(singleOps, c)) {
-            if (c == '/' && it + 1 != end && *(it + 1) == '/') {
-                while (it != end && *it != '\n') ++it;
+        if (isString) {
+            if (c == '"') {
+                tokens.emplace_back(Token{STRING, std::move(buffer)});
+                buffer.clear();
+                isString = false;
                 continue;
             }
+            if (c == '\\') {
+                if (std::next(it) == end)
+                    throw TokenError("escape at end");
+                char next_c = *std::next(it);
+                if (next_c == '"') {
+                    buffer += '"';
+                    ++it;
+                    continue;
+                }
+            }
+            buffer += c;
+            continue;
+        }
+
+        if (isChar) {
+            if (c == '\'') {
+                tokens.emplace_back(Token{CHAR, std::move(buffer)});
+                buffer.clear();
+                isChar = false;
+                continue;
+            }
+            if (c == '\\') {
+                if (std::next(it) == end)
+                    throw TokenError("escape at end");
+                ++it;
+            }
+            buffer += c;
+            continue;
+        }
+
+        if (isWhite(c)) {
             if (!buffer.empty()) {
-                tokens.emplace_back(Token{typeToken(buffer), buffer});
+                tokens.emplace_back(Token{typeToken(buffer), std::move(buffer)});
+                buffer.clear();
+            }
+            continue;
+        }
+
+        if (c == '"') {
+            isString = true;
+            continue;
+        }
+        if (c == '\'') {
+            isChar = true;
+            continue;
+        }
+
+        if (std::next(it) != end) {
+            char nc = *std::next(it);
+            bool match = false;
+            std::string op;
+
+            switch (c) {
+                case '=': if (nc == '=') { op = "=="; match = true; } break;
+                case '!': if (nc == '=') { op = "!="; match = true; } break;
+                case '&': if (nc == '&') { op = "&&"; match = true; } break;
+                case '|': if (nc == '|') { op = "||"; match = true; } break;
+                case '+': case '-': case '*': case '/': case '%':
+                    if (nc == '=') { op = std::string(1, c) + '='; match = true; } break;
+                default: break;
+            }
+
+            if (match) {
+                if (!buffer.empty()) {
+                    tokens.emplace_back(Token{typeToken(buffer), std::move(buffer)});
+                    buffer.clear();
+                }
+                tokens.emplace_back(Token{typeToken(op), std::move(op)});
+                ++it;
+                continue;
+            }
+        }
+
+        if (c == '/' && std::next(it) != end && *std::next(it) == '/') {
+            while (it != end && *it != '\n') ++it;
+            if (it != end) --it;
+            continue;
+        }
+
+        static const char* singleOps = "(){};,+-*/@=%&|!\"'";
+        if (std::strchr(singleOps, c)) {
+            if (!buffer.empty()) {
+                tokens.emplace_back(Token{typeToken(buffer), std::move(buffer)});
                 buffer.clear();
             }
             tokens.emplace_back(Token{typeToken(std::string(1, c)), std::string(1, c)});
             continue;
         }
+
         buffer += c;
     }
+
+    if (isString || isChar)
+        throw TokenError("unclosed string/char at EOF");
+
     if (!buffer.empty())
-        tokens.emplace_back(Token{typeToken(buffer), buffer});
+        tokens.emplace_back(Token{typeToken(buffer), std::move(buffer)});
 
     return tokens;
 }
 
-static inline auto parse(const Tokens& tokens) -> std::string {
+static inline auto parse(const Tokens& tokens) -> std::string { // TODO: class
     struct Parser {
         const Tokens& tokens;
         size_t pos = 0;
-        std::set<std::string> functionNames;
 
         auto match(Type type) -> bool {
             if (pos >= tokens.size())
@@ -321,6 +363,23 @@ static inline auto parse(const Tokens& tokens) -> std::string {
         }
 
         auto term() -> AST {
+            if (match(LINESEP))
+                return AST(HeadType{LINESEP}, "", {});
+            if (match(STRING))
+                return AST(HeadType{STRING}, tokens[pos-1].str, {});
+            if (match(CHAR))
+                return AST(HeadType{STRING}, tokens[pos-1].str, {});
+            if (match(INCLUDE)) {
+                Type type = UNAT;
+                AST ast;
+                if (match(AT))
+                    type = AT;
+                if (match(STRING))
+                    ast = AST(INCLUDE, tokens[pos - 1].str, {AST(HeadType{type}, "", {})});
+                if (!match(SEMICOLON))
+                    throw TokenError("Unexcept ';' after include XXX");
+                return ast;
+            }
             if (match(DIGITS)) {
                 std::string num = tokens[pos - 1].str;
                 AST num_node = AST(HeadType{DIGITS}, num, {});
@@ -360,19 +419,18 @@ static inline auto parse(const Tokens& tokens) -> std::string {
 
                 if (match(LEFT_PAREN)) {
                     std::vector<AST> params;
-                    if (!check(RIGHT_PAREN)) {
-                        do {
+                    if (!check(RIGHT_PAREN))
+                        do
                             params.push_back(term());
-                        } while (match(COMMA));
-                    }
+                        while (match(COMMA));
                     if (!match(RIGHT_PAREN))
                         throw TokenError("Expected ')'");
 
-                    match(SEMICOLON);
+                    std::string str = match(SEMICOLON) ? ";" : "";
 
                     return AST(HeadType{FUNCTIONCALL}, id_str, {
                         AST(HeadType{IDENTIFIER}, id_str, {}),
-                        AST(PARAMS, "", params)
+                        AST(PARAMS, str, params)
                     });
                 }
 
@@ -390,11 +448,10 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                         });
                     }
 
-                    if (match(SEMICOLON)) {
+                    if (match(SEMICOLON))
                         return AST(HeadType{EQUALS}, type, {
                             AST(HeadType{IDENTIFIER}, name, {})
                         });
-                    }
 
                     throw TokenError("Expected '=' or ';' in variable declaration");
                 }
@@ -436,6 +493,27 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                 );
             }
 
+            if (match(WHILE)) {
+                if (!match(LEFT_PAREN))
+                    throw TokenError("Expected '('");
+                AST expr = term();
+                if (!match(RIGHT_PAREN))
+                    throw TokenError("Expected ')'");
+                if (!match(LEFT_BRACE))
+                    throw TokenError("Expected '{'");
+                std::vector<AST> body;
+                while (!check(RIGHT_BRACE) && pos < tokens.size())
+                    body.push_back(term());
+                if (!match(RIGHT_BRACE))
+                    throw TokenError("Expected '}'");
+                return AST(
+                    WHILE, "", {
+                        AST(EXPR, "", {expr}),
+                        AST(BODY, "", body)
+                    }
+                );
+            }
+
             if (match(ELSE)) {
                 if (!match(RIGHT_PAREN))
                     throw TokenError("Expected ')'");
@@ -453,6 +531,27 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                 );
             }
 
+            if (match(ELIF)) {
+                if (!match(LEFT_PAREN))
+                    throw TokenError("Expected '('");
+                AST expr = term();
+                if (!match(RIGHT_PAREN))
+                    throw TokenError("Expected ')'");
+                if (!match(LEFT_BRACE))
+                    throw TokenError("Expected '{'");
+                std::vector<AST> body;
+                while (!check(RIGHT_BRACE) && pos < tokens.size())
+                    body.push_back(term());
+                if (!match(RIGHT_BRACE))
+                    throw TokenError("Expected '}'");
+                return AST(
+                    ELIF, "", {
+                        AST(EXPR, "", {expr}),
+                        AST(BODY, "", body)
+                    }
+                );
+            }
+
             if (match(SEMICOLON))
                 return AST(HeadType{IDENTIFIER}, "", {});
 
@@ -464,9 +563,9 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                 throw TokenError("Expected function name");
             std::string func_name = tokens[pos-1].str;
             std::string return_type = "void";
-            if (functionNames.count(func_name))
-                throw ASTError("Cannot define same functions.");
-            functionNames.insert(func_name);
+            // if (functionNames.count(func_name))
+            //     throw TokenError("Cannot define same functions.");
+            // functionNames.insert(func_name);
 
             if (!match(LEFT_PAREN))
                 throw TokenError("Expected '('");
@@ -522,12 +621,36 @@ static inline auto parse(const Tokens& tokens) -> std::string {
     while (parser.pos < tokens.size()) {
         try {
             AST term = parser.term();
-            code += term.cstring() + "\n";
+            code += term.cstring();
         } catch (const _TokenError& e) {
             code += "/* Parse Error:\n" + std::string(e.what()) + "\n*/\n";
             break;
         }
     }
+
+    // enum OS {
+    //     OS_WINDOWS, OS_LINUX, OS_MACOS
+    // };
+
+    // #if defined(_WIN32)
+    //     #define os OS_WINDOWS
+    //     #define sep_c '\\'
+    //     #define sep_s "\\"
+
+    //     #define linesep "\r\n"
+    // #elif defined(__linux__)
+    //     #define os OS_LINUX
+    //     #define sep_c '/'
+    //     #define sep_s "/"
+
+    //     #define linesep "\n"
+    // #elif defined(__APPLE__)
+    //     #define os OS_MACOS
+    //     #define sep_c '/'
+    //     #define sep_s "/"
+
+    //     #define linesep "\n"
+    // #endif
 
     return code;
 }
@@ -541,7 +664,7 @@ auto compiler(const std::string& str) -> std::string {
 }
 
 auto usage(const std::string& path) -> void {
-    std::cout << "Usage: " << path << " -c input.txt\n";
+    std::cout << "Usage: " << path << " -c input.txt" << std::endl;
     exit(EXIT_FAILURE);
 }
 
