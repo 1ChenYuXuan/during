@@ -2,6 +2,10 @@
 #include <stdio.h>
 
 int main() {
-    printf("Hello, world\n");
+    int a = 1;
+    while (a < 10000) {
+        a = a + 1;
+        printf("%d\n", a);
+    }
     return 0;
 }

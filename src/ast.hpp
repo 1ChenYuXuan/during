@@ -36,6 +36,8 @@ enum Type: uint16_t {
     BIGGER_EQUAL, SMALLER_EQUAL, NOT_EQUAL,
     EACH_AND, EACH_OR, EACH_NOT, EACH_XOR,
     ADD, SUB, MUL, DIV, MOD,
+    EACH_ANDSELF, EACH_ORSELF, EACH_XORSELF,
+    ADDSELF, SUBSELF, MULSELF, DIVSELF, MODSELF,
     FUNCTION,
     LEFT_PAREN,
     RIGHT_PAREN,
@@ -45,7 +47,7 @@ enum Type: uint16_t {
     COMMA, FUNCTIONCALL,
     PARAMS, BODY, TYPES,
     AT, RETURN, UNAT,
-    INCLUDE,
+    INCLUDE, IMPORT, CLASS,
     // ONE, TWO,
     STRING, CHAR,
     LINESEP,
@@ -63,6 +65,7 @@ struct HeadType {
 struct Token {
     HeadType head;
     std::string str;
+    size_t line;
 };
 
 class _ASTError : public Exception {

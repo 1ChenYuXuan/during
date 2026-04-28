@@ -2,9 +2,10 @@
 include "stdio.h";
 
 function main() @int {
-    while(1) {}
-    if (1) {
-        printf("Hello, world\n");
+    int a = 1;
+    while (a < 10000) {
+        reset a = a + 1;
+        printf("%d\n", a);
     }
     return 0;
 }

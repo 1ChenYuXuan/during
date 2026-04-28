@@ -42,10 +42,15 @@ auto AST::cstring(size_t indent) -> std::string const {
     case LINESEP:
         return "\n";
     case EQUALS: {
+        std::string type = this->asts[0].cstring();
         if (this->asts.size() == 1) {
-            return indentStr + this->asts[0].cstring() + " " + this->str + ";";
+            if (type == "reset")
+                return indentStr + this->str + ";";
+            return indentStr + type + " " + this->str + ";";
         } else {
-            return indentStr + this->asts[0].cstring() + " " + this->str + " = " + this->asts[1].cstring() + ";";
+            if (type == "reset")
+                return indentStr + this->str + " = " + this->asts[1].cstring() + ";";
+            return indentStr + type + " " + this->str + " = " + this->asts[1].cstring() + ";";
         }
         break;
     }
@@ -69,59 +74,85 @@ auto AST::cstring(size_t indent) -> std::string const {
         return "'" + this->str + "'";
         break;
     case ADD:
-        return this->asts[0].cstring() + " + " + this->asts[1].cstring();
+        return this->asts[0].cstring() + " + " + this->asts[1].cstring() ;
         break;
-    case SUB: 
+    case SUB:
         return this->asts[0].cstring() + " - " + this->asts[1].cstring();
         break;
-    case MUL: 
+    case MUL:
         return this->asts[0].cstring() + " * " + this->asts[1].cstring();
         break;
-    case DIV: 
+    case DIV:
         return this->asts[0].cstring() + " / " + this->asts[1].cstring();
         break;
-    case MOD: 
+    case MOD:
         return this->asts[0].cstring() + " % " + this->asts[1].cstring();
         break;
-    case BIGGER: 
+    case BIGGER:
         return this->asts[0].cstring() + " > " + this->asts[1].cstring();
         break;
-    case SMALLER: 
+    case SMALLER:
         return this->asts[0].cstring() + " < " + this->asts[1].cstring();
         break;
-    case AND: 
+    case AND:
         return this->asts[0].cstring() + " && " + this->asts[1].cstring();
         break;
-    case OR: 
+    case OR:
         return this->asts[0].cstring() + " || " + this->asts[1].cstring();
         break;
     case NOT: 
         return "!" + this->asts[0].cstring();
         break;
-    case EQUAL: 
+    case EQUAL:
         return this->asts[0].cstring() + " == " + this->asts[1].cstring();
         break;
-    case NOT_EQUAL: 
+    case NOT_EQUAL:
         return this->asts[0].cstring() + " != " + this->asts[1].cstring();
         break;
-    case BIGGER_EQUAL: 
+    case BIGGER_EQUAL:
         return this->asts[0].cstring() + " >= " + this->asts[1].cstring();
         break;
-    case SMALLER_EQUAL: 
+    case SMALLER_EQUAL:
         return this->asts[0].cstring() + " <= " + this->asts[1].cstring();
         break;
-    case EACH_OR: 
+    case EACH_OR:
         return this->asts[0].cstring() + " | " + this->asts[1].cstring();
         break;
-    case EACH_AND: 
+    case EACH_AND:
         return this->asts[0].cstring() + " & " + this->asts[1].cstring();
         break;
-    case EACH_NOT: 
+    case EACH_NOT:
         return this->asts[0].cstring() + " ~ " + this->asts[1].cstring();
         break;
-    case EACH_XOR: 
+    case EACH_XOR:
         return this->asts[0].cstring() + " ^" + this->asts[1].cstring();
         break;
+
+    case ADDSELF:
+        return this->asts[0].cstring() + " += " + this->asts[1].cstring();
+        break;
+    case SUBSELF:
+        return this->asts[0].cstring() + " -= " + this->asts[1].cstring();
+        break;
+    case MULSELF:
+        return this->asts[0].cstring() + " *= " + this->asts[1].cstring();
+        break;
+    case DIVSELF:
+        return this->asts[0].cstring() + " /= " + this->asts[1].cstring();
+        break;
+    case MODSELF:
+        return this->asts[0].cstring() + " %= " + this->asts[1].cstring();
+        break;
+    case EACH_ORSELF:
+        return this->asts[0].cstring() + " |= " + this->asts[1].cstring();
+        break;
+    case EACH_ANDSELF:
+        return this->asts[0].cstring() + " &= " + this->asts[1].cstring();
+        break;
+    case EACH_XORSELF:
+        return (this->str == ";" ? indentStr : "") + this->asts[0].cstring() + " ^=" + this->asts[1].cstring() + this->str;
+        break;
+    
     case LEFT_PAREN:
         return "(" + this->asts[0].cstring() + ")";
     case IF: {
