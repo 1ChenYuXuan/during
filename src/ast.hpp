@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-static const auto magical = 4;
+static constexpr auto magical = 4;
 
 enum Type: uint16_t {
     IF, ELSE, EXPR, WHILE, ELIF,
@@ -35,7 +35,7 @@ enum Type: uint16_t {
     BIGGER, SMALLER, EQUALS, EQUAL, AND, OR, NOT,
     BIGGER_EQUAL, SMALLER_EQUAL, NOT_EQUAL,
     EACH_AND, EACH_OR, EACH_NOT, EACH_XOR,
-    ADD, SUB, MUL, DIV, MOD,
+    ADD, SUB, MUL, DIV, MOD, POINT,
     EACH_ANDSELF, EACH_ORSELF, EACH_XORSELF,
     ADDSELF, SUBSELF, MULSELF, DIVSELF, MODSELF,
     FUNCTION,
@@ -48,6 +48,7 @@ enum Type: uint16_t {
     PARAMS, BODY, TYPES,
     AT, RETURN, UNAT,
     INCLUDE, IMPORT, CLASS,
+    VARIBLES, FUNCTIONS,
     // ONE, TWO,
     STRING, CHAR,
     LINESEP,
@@ -91,6 +92,7 @@ public:
     operator std::string() const;
     auto operator[] (size_t index) -> AST&; // for ast[i]
     auto operator* () -> HeadType&; // for ast->type
+    auto string() -> std::string&;
 };
 
 using ASTs = std::vector<AST>;

@@ -56,13 +56,27 @@ auto AST::cstring(size_t indent) -> std::string const {
     }
     case INCLUDE:
         if (this->asts[0].head.type == AT)
-            return "#include \"" + this->str + "\"";
+            return "#include \"" + this->str + "\"\n";
         else
-            return "#include <" + this->str + ">";
+            return "#include <" + this->str + ">\n";
         break;
     case RETURN:
         return indentStr + "return " + this->asts[0].cstring() + ";";
         break;
+    case CLASS: {
+        std::string varString;
+        std::string fnString;
+        for (AST& ast : this->asts[0].asts) {
+            ast.str = this->str + "_" + ast.str;
+            varString += ast.cstring(indent+magical) + "\n";
+        }
+        for (AST& ast : this->asts[1].asts)
+            fnString += ast.cstring(indent) + "\n";
+        return (this->asts[1].asts.size() == 0 ? "" : "\n") + fnString + indentStr + "typedef struct " + this->str + " {\n" +
+               varString +
+               "\n} " + this->str + ";";
+        break;
+    }
     case IDENTIFIER:
     case DIGITS:
         return this->str;
@@ -87,6 +101,9 @@ auto AST::cstring(size_t indent) -> std::string const {
         break;
     case MOD:
         return this->asts[0].cstring() + " % " + this->asts[1].cstring();
+        break;
+    case POINT:
+        return this->asts[0].cstring() + "." + this->asts[1].cstring();
         break;
     case BIGGER:
         return this->asts[0].cstring() + " > " + this->asts[1].cstring();
@@ -227,4 +244,8 @@ auto AST::operator[] (size_t index) -> AST& {
 
 auto AST::operator* () -> HeadType& {
     return this->head;
+}
+
+auto AST::string() -> std::string& {
+    return this->str;
 }

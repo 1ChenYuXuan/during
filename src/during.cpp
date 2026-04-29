@@ -190,6 +190,8 @@ static inline auto typeToken(const std::string& str) -> Type {
         if (newString == "&=") return EACH_ANDSELF;
         if (newString == "^=") return EACH_XORSELF;
 
+        if (newString == ".") return POINT;
+
         if (newString == "FUNCTION") return FUNCTION;
     }
 
@@ -225,7 +227,7 @@ static inline auto lexer(const std::string& str) -> Tokens {
             ++line;
 #endif
             if (isString || isChar)
-                throw TokenError("unclosed string/char");
+                throw _TokenError("unclosed string/char", line);
 
             if (!buffer.empty()) {
                 tokens.emplace_back(Token{typeToken(buffer), std::move(buffer), line});
@@ -265,7 +267,7 @@ static inline auto lexer(const std::string& str) -> Tokens {
             }
             if (c == '\\') {
                 if (std::next(it) == end)
-                    throw TokenError("escape at end");
+                    throw _TokenError("escape at end", line);
                 ++it;
             }
             buffer += c;
@@ -321,7 +323,7 @@ static inline auto lexer(const std::string& str) -> Tokens {
             continue;
         }
 
-        static const char* singleOps = "(){};,+-*/@=%&|!\"'^|";
+        static const char* singleOps = "(){};,+-*/@=%&|!\"'^|.";
         if (std::strchr(singleOps, c)) {
             if (!buffer.empty()) {
                 tokens.emplace_back(Token{typeToken(buffer), std::move(buffer), line});
@@ -335,13 +337,14 @@ static inline auto lexer(const std::string& str) -> Tokens {
     }
 
     if (isString || isChar)
-        throw TokenError("unclosed string/char at EOF");
+        throw _TokenError("unclosed string/char at EOF", line);
 
     if (!buffer.empty())
         tokens.emplace_back(Token{typeToken(buffer), std::move(buffer), line});
 
     return tokens;
 }
+
 static inline auto parse(const Tokens& tokens) -> std::string {
     struct Parser {
         const Tokens& tokens;
@@ -366,7 +369,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
         auto getOp() -> Type {
             if (checkOp())
                 return tokens[pos].head.type;
-            throw _TokenError("Except an op there", __LINE__);
+            throw _TokenError("Except an op there", tokens[pos].line);
         }
 
         auto checkOp() -> bool {
@@ -374,7 +377,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                     check(BIGGER)       || check(SMALLER)       || check(AND)           || check(OR)        || check(NOT)     ||
                     check(EQUAL)        || check(BIGGER_EQUAL)  || check(SMALLER_EQUAL) || check(NOT_EQUAL) ||
                     check(ADDSELF)      || check(SUBSELF)       || check(MULSELF)       || check(DIVSELF)   || check(MODSELF) ||
-                    check(EACH_ANDSELF) || check(EACH_ORSELF)   || check(EACH_XORSELF)  ||
+                    check(EACH_ANDSELF) || check(EACH_ORSELF)   || check(EACH_XORSELF)  || check(POINT)     ||
                     check(EACH_NOT)     || check(EACH_AND)      || check(EACH_OR)       || check(EACH_XOR);
         }
 
@@ -383,7 +386,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                     match(BIGGER)       || match(SMALLER)       || match(AND)           || match(OR)        || match(NOT)     ||
                     match(EQUAL)        || match(BIGGER_EQUAL)  || match(SMALLER_EQUAL) || match(NOT_EQUAL) ||
                     match(ADDSELF)      || match(SUBSELF)       || match(MULSELF)       || match(DIVSELF)   || match(MODSELF) ||
-                    match(EACH_ANDSELF) || match(EACH_ORSELF)   || match(EACH_XORSELF)  ||
+                    match(EACH_ANDSELF) || match(EACH_ORSELF)   || match(EACH_XORSELF)  || match(POINT)     ||
                     match(EACH_NOT)     || match(EACH_AND)      || match(EACH_OR)       || match(EACH_XOR);
         }
 
@@ -423,7 +426,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                             params.push_back(parseExpr());
                         while (match(COMMA));
                     if (!match(RIGHT_PAREN))
-                        throw TokenError("Expected ')'");
+                        throw _TokenError("Expected ')'", tokens[pos].line);
 
                     std::string str = match(SEMICOLON) ? ";" : "";
 
@@ -439,7 +442,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
             if (match(LEFT_PAREN)) {
                 AST node = AST(LEFT_PAREN, "", {parseExpr()});
                 if (!match(RIGHT_PAREN))
-                    throw TokenError("Expected ')'");
+                    throw _TokenError("Expected ')'", tokens[pos].line);
 
                 if (checkOp()) {
                     Type op = getOp();
@@ -454,24 +457,39 @@ static inline auto parse(const Tokens& tokens) -> std::string {
             if (match(CHAR))
                 return AST(HeadType{STRING}, tokens[pos-1].str, {});
 
-            throw _TokenError("Unexpected expr token: " + tokens[pos].str, __LINE__);
+            throw _TokenError("Expected expr token: " + tokens[pos].str, tokens[pos].line);
         }
 
         auto parseStmt() -> AST {
             if (match(CLASS)) {
                 if (!match(IDENTIFIER))
-                    throw _TokenError("Unexcept an identifier after 'class'", __LINE__);
+                    throw _TokenError("Expected an identifier after 'class'", tokens[pos].line);
                 std::string identifier = tokens[pos - 1].str;
                 if (!match(LEFT_BRACE))
-                    throw _TokenError("Unexcept '{'", __LINE__);
-                std::vector<AST> privates, publics, projects;
+                    throw _TokenError("Expected '{'", tokens[pos].line);
+                std::vector<AST> varibles;
+                std::vector<AST> functions;
                 while (!match(RIGHT_BRACE)) {
                     if ((pos + 1) >= tokens.size())
-                        throw _TokenError("TODO", __LINE__);
+                        throw _TokenError("Expected '{'", tokens[pos].line);
+                    size_t _pos = pos;
+                    AST ast = parseStmt();
+                    if ((*ast).type == LINESEP)
+                        continue;
+                    else if ((*ast).type == EQUALS)
+                        varibles.push_back(ast);
+                    else if ((*ast).type == FUNCTION)
+                        functions.push_back(ast);
+                    else
+                        throw _TokenError("Excepted a varible or a function", tokens[_pos].line);
                 }
+                return AST(CLASS, identifier, {
+                    AST(VARIBLES, "", varibles),
+                    AST(FUNCTIONS, "", functions)
+                });
             }
             if (match(IMPORT))
-                throw TODOError("TODO: import [@] xxx");
+                throw _TODOError("TODO: import [@] xxx", tokens[pos].line);
             if (match(LINESEP))
                 return AST(HeadType{LINESEP}, "", {});
 
@@ -483,7 +501,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                 if (match(STRING))
                     ast = AST(INCLUDE, tokens[pos - 1].str, {AST(HeadType{type}, "", {})});
                 if (!match(SEMICOLON))
-                    throw _TokenError("Unexcept ';' after include XXX", __LINE__);
+                    throw _TokenError("Expected ';' after include XXX", tokens[pos].line);
                 return ast;
             }
 
@@ -507,7 +525,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                     if (match(EQUALS)) {
                         AST expr = parseExpr();
                         if (!match(SEMICOLON))
-                            throw _TokenError("Expected ';' in variable declaration", __LINE__);;
+                            throw _TokenError("Expected ';' in variable declaration", tokens[pos].line);;
                         return AST(HeadType{EQUALS}, type, {
                             AST(HeadType{IDENTIFIER}, name, {}),
                             expr
@@ -519,7 +537,7 @@ static inline auto parse(const Tokens& tokens) -> std::string {
                             AST(HeadType{IDENTIFIER}, name, {})
                         });
 
-                    throw _TokenError("Expected '=' or ';' in variable declaration", __LINE__);
+                    throw _TokenError("Expected '=' or ';' in variable declaration", tokens[pos].line);
                 }
 
                 pos--;
@@ -528,17 +546,17 @@ static inline auto parse(const Tokens& tokens) -> std::string {
 
             if (match(IF)) {
                 if (!match(LEFT_PAREN))
-                    throw _TokenError("Expected '('", __LINE__);
+                    throw _TokenError("Expected '('", tokens[pos].line);
                 AST expr = parseExpr();
                 if (!match(RIGHT_PAREN))
-                    throw _TokenError("Expected ')'", __LINE__);
+                    throw _TokenError("Expected ')'", tokens[pos].line);
                 if (!match(LEFT_BRACE))
-                    throw _TokenError("Expected '{'", __LINE__);
+                    throw _TokenError("Expected '{'", tokens[pos].line);
                 std::vector<AST> body;
                 while (!check(RIGHT_BRACE) && pos < tokens.size())
                     body.push_back(parseStmt());
                 if (!match(RIGHT_BRACE))
-                    throw _TokenError("Expected '}'", __LINE__);
+                    throw _TokenError("Expected '}'", tokens[pos].line);
                 return AST(
                     IF, "", {
                         AST(EXPR, "", {expr}),
@@ -549,18 +567,18 @@ static inline auto parse(const Tokens& tokens) -> std::string {
 
             if (match(WHILE)) {
                 if (!match(LEFT_PAREN))
-                    throw _TokenError("Expected '('", __LINE__);
+                    throw _TokenError("Expected '('", tokens[pos].line);
                 AST expr = parseExpr();
                 // printf("%d\n", tokens[pos].head.type);
                 if (!match(RIGHT_PAREN))
-                    throw _TokenError("Expected ')'", __LINE__);
+                    throw _TokenError("Expected ')'", tokens[pos].line);
                 if (!match(LEFT_BRACE))
-                    throw _TokenError("Expected '{'", __LINE__);
+                    throw _TokenError("Expected '{'", tokens[pos].line);
                 std::vector<AST> body;
                 while (!check(RIGHT_BRACE) && pos < tokens.size())
                     body.push_back(parseStmt());
                 if (!match(RIGHT_BRACE))
-                    throw _TokenError("Expected '}'", __LINE__);
+                    throw _TokenError("Expected '}'", tokens[pos].line);
                 return AST(
                     WHILE, "", {
                         AST(EXPR, "", {expr}),
@@ -571,12 +589,12 @@ static inline auto parse(const Tokens& tokens) -> std::string {
 
             if (match(ELSE)) {
                 if (!match(LEFT_BRACE))
-                    throw _TokenError("Expected '{'", __LINE__);
+                    throw _TokenError("Expected '{'", tokens[pos].line);
                 std::vector<AST> body;
                 while (!check(RIGHT_BRACE) && pos < tokens.size())
                     body.push_back(parseStmt());
                 if (!match(RIGHT_BRACE))
-                    throw _TokenError("Expected '}'", __LINE__);
+                    throw _TokenError("Expected '}'", tokens[pos].line);
                 return AST(
                     ELSE, "", {
                         AST(BODY, "", body)
@@ -586,17 +604,17 @@ static inline auto parse(const Tokens& tokens) -> std::string {
 
             if (match(ELIF)) {
                 if (!match(LEFT_PAREN))
-                    throw _TokenError("Expected '('", __LINE__);
+                    throw _TokenError("Expected '('", tokens[pos].line);
                 AST expr = parseExpr();
                 if (!match(RIGHT_PAREN))
-                    throw _TokenError("Expected ')'", __LINE__);
+                    throw _TokenError("Expected ')'", tokens[pos].line);
                 if (!match(LEFT_BRACE))
-                    throw _TokenError("Expected '{'", __LINE__);
+                    throw _TokenError("Expected '{'", tokens[pos].line);
                 std::vector<AST> body;
                 while (!check(RIGHT_BRACE) && pos < tokens.size())
                     body.push_back(parseStmt());
                 if (!match(RIGHT_BRACE))
-                    throw _TokenError("Expected '}'", __LINE__);
+                    throw _TokenError("Expected '}'", tokens[pos].line);
                 return AST(
                     ELIF, "", {
                         AST(EXPR, "", {expr}),
@@ -607,18 +625,20 @@ static inline auto parse(const Tokens& tokens) -> std::string {
 
             if (match(SEMICOLON))
                 return AST(HeadType{IDENTIFIER}, "", {});
+            
+            // if ()m,as
 
             return parseExpr();
         }
 
         auto parseFunction() -> AST {
             if (!match(IDENTIFIER))
-                throw _TokenError("Expected function name", __LINE__);
+                throw _TokenError("Expected function name", tokens[pos].line);
             std::string func_name = tokens[pos-1].str;
             std::string return_type = "void";
 
             if (!match(LEFT_PAREN))
-                throw TokenError("Expected '('");
+                throw _TokenError("Expected '('", tokens[pos].line);
 
             std::vector<AST> params;
             std::vector<AST> types;
@@ -627,34 +647,34 @@ static inline auto parse(const Tokens& tokens) -> std::string {
             if (!check(RIGHT_PAREN)) {
                 do {
                     if (!match(IDENTIFIER))
-                        throw _TokenError("Expected parameter type", __LINE__);
+                        throw _TokenError("Expected parameter type", tokens[pos].line);
                     std::string param_type = tokens[pos-1].str;
                     types.emplace_back(AST(HeadType{IDENTIFIER}, param_type, {}));
 
                     if (!match(IDENTIFIER))
-                        throw _TokenError("Expected parameter name", __LINE__);
+                        throw _TokenError("Expected parameter name", tokens[pos].line);
                     params.emplace_back(HeadType{IDENTIFIER}, tokens[pos-1].str, ASTs{});
 
                 } while (match(COMMA));
             }
 
             if (!match(RIGHT_PAREN))
-                throw _TokenError("Expected ')'", __LINE__);
+                throw _TokenError("Expected ')'", tokens[pos].line);
 
             if (match(AT)) {
                 if (!match(IDENTIFIER))
-                    throw _TokenError("Expected return type after @", __LINE__);
+                    throw _TokenError("Expected return type after @", tokens[pos].line);
                 return_type = tokens[pos-1].str;
             }
 
             if (!match(LEFT_BRACE))
-                throw _TokenError("Expected '{'", __LINE__);
+                throw _TokenError("Expected '{'", tokens[pos].line);
 
             while (!check(RIGHT_BRACE) && pos < tokens.size())
                 body.push_back(parseStmt());
 
             if (!match(RIGHT_BRACE))
-                throw _TokenError("Expected '}'", __LINE__);
+                throw _TokenError("Expected '}'", tokens[pos].line);
 
             return AST(HeadType{FUNCTION}, func_name, {
                 AST(HeadType{PARAMS}, "", params),
